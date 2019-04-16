@@ -1,0 +1,10 @@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ mkc: starting treefree.cpp
+checksource treefree.cpp
+ident treefree.cpp
+treefree.cpp:
+     $Id: treefree.cpp,v 1.72 2015-06-29 13:45:29-07 - - $
+cpplint.py.perl treefree.cpp
+Done processing treefree.cpp
+g++ -g -O0 -Wall -Wextra -Wpedantic -Wshadow -fdiagnostics-color=never -std=gnu++17 -Wold-style-cast treefree.cpp -o treefree -lm
+rm -f treefree.o
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ mkc: finished treefree.cpp

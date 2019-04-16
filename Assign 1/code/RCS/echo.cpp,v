@@ -1,0 +1,63 @@
+head	1.3;
+access;
+symbols;
+locks;
+comment	@// @;
+
+
+1.3
+date	2018.07.17.23.29.39;	author -;	state -;
+branches;
+next	1.2;
+
+1.2
+date	2018.07.17.23.29.29;	author -;	state -;
+branches;
+next	1.1;
+
+1.1
+date	2018.07.17.23.29.23;	author -;	state -;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@-
+@
+text
+@#include <iostream>
+using namespace std;
+int main (int argc, char** argv) {
+   for (int i = 1; i < argc; ++i) {
+      if (i > 1) cout << " ";
+      cout << argv[i];
+   }
+   cout << endl;
+   return 0;
+}
+@
+
+
+1.2
+log
+@-
+@
+text
+@d4 1
+a4 1
+   for (size_t i = 1; i < argc; ++i) {
+@
+
+
+1.1
+log
+@-
+@
+text
+@d2 1
+@
