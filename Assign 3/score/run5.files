@@ -1,0 +1,12 @@
+-test3.in: 1: # Comments should be ignored
+Comments should be ignored
+-test3.in: 2: 
+-test3.in: 3: 
+-test3.in: 4: also ignore blank lines
+Key " also ignore blank lines " not found.
+-test3.in: 5: this file contains nonexistent keys
+Key " this file contains nonexistent keys " not found.
+-test3.in: 6: all output should be error messages
+Key " all output should be error messages " not found.
+-test3.in: 7: # $Id: test3.in,v 1.1 2016-06-28 14:48:38-07 - - $
+$Id: test3.in,v 1.1 2016-06-28 14:48:38-07 - - $

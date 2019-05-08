@@ -1,0 +1,974 @@
+head	1.19;
+access;
+symbols;
+locks;
+comment	@// @;
+
+
+1.19
+date	2019.04.25.18.52.22;	author -;	state -;
+branches;
+next	1.18;
+
+1.18
+date	2019.04.25.18.45.09;	author -;	state -;
+branches;
+next	1.17;
+
+1.17
+date	2018.01.25.22.02.55;	author -;	state -;
+branches;
+next	1.16;
+
+1.16
+date	2016.01.15.00.10.40;	author -;	state -;
+branches;
+next	1.15;
+
+1.15
+date	2016.01.14.23.13.33;	author -;	state -;
+branches;
+next	1.14;
+
+1.14
+date	2016.01.14.22.45.21;	author -;	state -;
+branches;
+next	1.13;
+
+1.13
+date	2016.01.14.00.21.53;	author -;	state -;
+branches;
+next	1.12;
+
+1.12
+date	2016.01.13.21.49.20;	author -;	state -;
+branches;
+next	1.11;
+
+1.11
+date	2014.06.11.20.49.31;	author -;	state -;
+branches;
+next	1.10;
+
+1.10
+date	2014.04.10.00.04.58;	author -;	state -;
+branches;
+next	1.9;
+
+1.9
+date	2014.03.27.02.55.18;	author -;	state -;
+branches;
+next	1.8;
+
+1.8
+date	2014.03.27.01.39.40;	author -;	state -;
+branches;
+next	1.7;
+
+1.7
+date	2014.03.27.00.15.54;	author -;	state -;
+branches;
+next	1.6;
+
+1.6
+date	2013.06.19.01.26.51;	author -;	state -;
+branches;
+next	1.5;
+
+1.5
+date	2013.06.19.01.02.12;	author -;	state -;
+branches;
+next	1.4;
+
+1.4
+date	2013.06.19.01.00.53;	author -;	state -;
+branches;
+next	1.3;
+
+1.3
+date	2013.06.19.01.00.24;	author -;	state -;
+branches;
+next	1.2;
+
+1.2
+date	2013.06.19.00.59.10;	author -;	state -;
+branches;
+next	1.1;
+
+1.1
+date	2013.06.19.00.31.28;	author -;	state -;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.19
+log
+@-
+@
+text
+@// $Id: commands.cpp,v 1.17 2018-01-25 14:02:55-08 - - $
+
+#include "commands.h"
+#include "debug.h"
+
+command_hash cmd_hash {
+   {"cat"   , fn_cat   },
+   {"cd"    , fn_cd    },
+   {"echo"  , fn_echo  },
+   {"exit"  , fn_exit  },
+   {"ls"    , fn_ls    },
+   {"lsr"   , fn_lsr   },
+   {"make"  , fn_make  },
+   {"mkdir" , fn_mkdir },
+   {"prompt", fn_prompt},
+   {"pwd"   , fn_pwd   },
+   {"rm"    , fn_rm    },
+};
+
+command_fn find_command_fn (const string& cmd) {
+   // Note: value_type is pair<const key_type, mapped_type>
+   // So: iterator->first is key_type (string)
+   // So: iterator->second is mapped_type (command_fn)
+   DEBUGF ('c', "[" << cmd << "]");
+   const auto result = cmd_hash.find (cmd);
+   if (result == cmd_hash.end()) {
+      throw command_error (cmd + ": no such function");
+   }
+   return result->second;
+}
+
+command_error::command_error (const string& what):
+            runtime_error (what) {
+}
+
+int exit_status_message() {
+   int exit_status = exit_status::get();
+   cout << execname() << ": exit(" << exit_status << ")" << endl;
+   return exit_status;
+}
+
+void fn_cat (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   inode_ptr working_dir;
+   map<string, inode_ptr>::iterator it;
+   string filename;
+   if (words.size() <= 1 ) {
+      cout << "Syntax error!\n";
+   } 
+   else {
+      for( long unsigned i = 1; i <= words.size()- 1; ++i ) {
+         if( words.at(i).size() == 1 ) {
+            working_dir = state.get_cwd();
+            filename = words.at(i);
+         }
+         else {
+            string dest = "";
+            if( words.at(i)[0] == '/' ) {
+               dest = dest + "/";
+            }
+            wordvec path = split( words.at(i), "/" );
+ 
+            if (path.size() == 1) {
+               filename = path.at( path.size() - 1 );
+            }
+            else if( path.size() > 1 ){
+               filename = path.at( path.size() - 1 );
+               for( long unsigned j = 0; j <= path.size() - 2; ++j ){
+                  dest = dest + path.at(j) + "/";
+               }
+            }
+            working_dir = state.get_dest( dest );
+            if( working_dir == nullptr ) {
+               return;
+            }
+         }
+         //find file in working_dir;
+         map<string, inode_ptr> current_dirents;
+         current_dirents = working_dir->get_contents()->get_dirents();
+         it = current_dirents.find( filename );
+         if( it != current_dirents.end() && 
+              it->second->get_type() == "FILE" ){
+             wordvec contents = it->second->get_contents()->readfile();
+             if( contents.size() > 0 ) {
+                for (long unsigned k = 0; 
+                      k <= contents.size() - 1; ++k ) {
+                   cout << contents.at(k) << " ";
+                }
+                cout << "\n";              
+             }
+          }
+          else {
+              cout << "There is no such file '" << filename << "'\n";
+              return;
+          }
+      }
+   } 
+}
+
+void fn_cd (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   string path = words.at(1);
+   inode_ptr working_dir;
+
+   if( path.size() == 0 ) {
+       cout << "Syntax error\n";
+   }
+   else {
+      if( path[0] == '/' ) {
+         working_dir = state.get_root();
+      }
+      else {
+         working_dir = state.get_cwd();
+      }
+      wordvec directories = split(path, "/");
+      map<string, inode_ptr> current_dirents;
+      map<string, inode_ptr>::iterator it ;
+      if (directories.size() >=2 ) {
+         for( long unsigned i = 0; i <= directories.size() - 2; ++i ) {
+            current_dirents = 
+                working_dir->get_contents()->get_dirents();
+            it = current_dirents.find( directories.at(i) );
+            if ( it != current_dirents.end() ) {
+                working_dir = it->second;
+            } 
+            else {
+                cout << "There are not such directory.\n";
+            }    
+         }
+      }
+      if( directories.size() == 0 ) {
+         state.set_cwd( state.get_root() );
+      }
+      else {
+         current_dirents = working_dir->get_contents()->get_dirents();
+         it = current_dirents.find(
+               directories.at( directories.size() - 1 ) );
+         if (it != current_dirents.end() ) {
+            working_dir = it->second;
+            state.set_cwd( working_dir );
+         }
+         else {
+            cout << "There is no such directories.\n";
+         }
+      }   
+   }
+}
+void fn_echo (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   cout << word_range (words.cbegin() + 1, words.cend()) << endl;
+}
+
+
+void fn_exit (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   //delete all inode
+   inode_ptr root = state.get_root();
+   wordvec path;
+   path.push_back("/");
+   //set the exit status;
+   int status;
+   if( words.size() > 1 ) {
+      status = atoi( words.at(1).c_str() );
+   }
+   else {
+      status = 0;
+   }
+   exit_status::set(status);
+   exit_status_message();
+   exit(status);
+}
+
+void fn_ls (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   inode_ptr  working_dir;
+   bool flag = true;
+   if( words.size() == 1 ) {
+      working_dir = state.get_cwd();
+      flag = true;
+   }
+   else {
+      string path = words[1];
+      if( path[0] =='/' ) {
+         working_dir = state.get_root();
+      }
+      else {
+         working_dir = state.get_cwd();
+      }
+      if( path.size() > 1 ) {
+         wordvec dirs = split(path, "/");
+         map<string, inode_ptr>::iterator it;
+         for( long unsigned i = 0; i <= dirs.size()-1; ++i) {
+            map<string, inode_ptr> temp;
+            temp = working_dir->get_contents()->get_dirents();
+            it = temp.find( dirs.at(i));
+            if( it == temp.end()) {
+               cout << "There is no such directory.\n";
+               flag = false;
+            }
+            else {
+               working_dir = it->second;
+            } 
+        }
+     } 
+   }
+   if( flag ) {
+      map<string, inode_ptr> print_map = 
+            working_dir->get_contents()->get_dirents();
+      map<string, inode_ptr>::iterator it;
+      for (it = print_map.begin(); it != print_map.end(); ++it){
+         cout<< it->first << "\n";
+      }
+   cout << "\n";
+   }
+}
+
+void fn_lsr (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   inode_ptr working_dir;
+   wordvec path;
+   string dest = "";
+   map<string, inode_ptr>::iterator it;
+   map<string, inode_ptr> current_dirents;
+   inode_ptr subdir;
+   wordvec recur_call;
+   int count(0);
+   //inode_ptr cwd_hold = state.get_cwd();
+   recur_call.push_back("lsr");
+
+   if( words.size() == 1 ) {
+      working_dir = state.get_cwd();
+      dest = dest + working_dir->get_name();
+   }
+   else{
+      dest = words[1];
+      working_dir = state.get_dest( dest );
+   }
+   //ls current directory
+   //print in pre-order (root, left, right )
+   current_dirents = working_dir->get_contents()->get_dirents();
+   count += 3;
+   for( it = current_dirents.begin();
+      it != current_dirents.end(); ++it ) {
+      for( int i = 0; i < count; ++i ) {
+         cout << " ";
+      }      
+      cout << it->first << "\n";
+   }
+   for( it = current_dirents.begin();
+        it != current_dirents.end(); ++it ) {
+      if( (it->second->get_type() == "DIRECTORY")
+          && (it->first != ".") && (it->first != "..") ) {
+          dest = it->first;
+          cout << dest << "\n";
+          //recursive call
+          recur_call.push_back( dest );
+          // set new current working for state;
+          state.set_cwd( working_dir );
+          fn_lsr( state, recur_call );
+      }
+   }
+}
+void fn_make (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   inode_ptr working_dir;
+   bool flag = true;
+   if( words.size() == 1 ) {
+      cout << "Syntax error!\n";
+   }
+   else {
+      if( words[1].at(0) == '/') {
+         working_dir = state.get_root();
+      }
+      else {
+         working_dir = state.get_cwd();
+      }
+      wordvec path = split( words[1], "/" );
+      string filename;
+      if( path.size() == 1 ) {
+         filename = path.at(0);
+      }
+      else if( path.size() > 1 ) {
+         filename = path.at( path.size()-1 );
+         map<string, inode_ptr>::iterator it;
+         map<string, inode_ptr> current_dirents;
+         current_dirents = working_dir->get_contents()->get_dirents();
+         for( long unsigned i = 0; i <= path.size() - 2; ++i ){
+            it = current_dirents.find( path.at(i) );
+            if( it != current_dirents.end() ) {
+               working_dir = it->second;
+            }
+            else {
+               cout << "There is not such directory '" 
+                    << path.at(i) <<"'\n";
+               flag = false;
+            }
+         } 
+      }
+      wordvec contents;
+      if( words.size() > 2 ) {
+         for( long unsigned i = 2; i <= words.size() -1 ; ++i) {
+            contents.push_back( words.at(i) );   
+         }
+      }
+      //create a file
+      if( flag ) {
+         working_dir->get_contents()->mkfile( filename, contents ); 
+      }
+   }
+}
+void fn_mkdir (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   string path = words[1];
+   bool flag = true;
+   inode_ptr working_dir; 
+   //start from root
+   if( path[0] == '/' ) {
+      working_dir = state.get_root();
+   }
+   else {
+      working_dir = state.get_cwd();
+   }
+   wordvec multi_dir = split( path, "/" );
+   //cout << multi_dir.at(0) << "\n";
+   if (multi_dir.size() > 1 ) {
+         shared_ptr< base_file > temp;
+         map<string, inode_ptr>::iterator it;
+      for (long unsigned i = 0; i <= multi_dir.size() - 2; ++i) {
+         temp = working_dir->get_contents();
+         map<string, inode_ptr> my_dirents = temp->get_dirents();
+        // cout<< "Here is multi_dir["<<i<<"] : " << multi_dir.at(i);
+         it = my_dirents.find(multi_dir.at(i));
+         if( it != my_dirents.end() ) {
+            working_dir = it->second;
+            
+             //cout << "I'm here\n";
+         }  
+         else {
+            //throw file_error( "Directory does not exist." );
+            cout << "Directory " << multi_dir[i] 
+                 << " does not exist. \n";
+            flag = false;
+         }
+      }
+   }
+   else if ( multi_dir.size() == 0 ) {
+      cout << "Syntax error.\n";
+      flag = false;
+   }
+   //create a directory
+   if( flag ) {
+      shared_ptr<base_file> new_dir;
+      new_dir = working_dir->get_contents();
+      new_dir->mkdir( multi_dir[ multi_dir.size() -1 ], working_dir );
+   }
+}
+
+void fn_prompt (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   string str = "";
+   for( long unsigned i = 1; i <= words.size()-1; ++i) {
+      str = str + words.at(i) + " ";
+   } 
+   cout << str << "\n";
+}
+
+void fn_pwd (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   
+   inode_ptr working_dir = state.get_cwd();
+   inode_ptr parents;
+   string current_name = working_dir->get_name();
+ 
+   wordvec path;
+   path.push_back( current_name );
+
+   map<string, inode_ptr>::iterator it;
+
+   map<string, inode_ptr> current_dirents;
+   current_dirents = working_dir->get_contents()->get_dirents();
+    
+   it = current_dirents.find("..");
+   parents = it->second;
+   while (parents != state.get_root() ) {
+      working_dir = parents;
+      current_name = working_dir->get_name();
+      path.push_back( current_name );
+ 
+      current_dirents = working_dir->get_contents()->get_dirents();
+      it = current_dirents.find("..");
+      parents = it->second;
+   }
+   //add root to vector name
+   if( parents != working_dir ) {
+      current_name = parents->get_name();
+      path.push_back( current_name );
+   }
+   for( int i = path.size() - 1; i >= 0; --i) {
+      cout<< path.at(i);
+      if( path.at(i) != "/" ) {
+         cout <<"/";
+      };
+   }
+   cout<<"\n";
+}
+
+void fn_rm (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   map<string, inode_ptr>::iterator it;
+   map<string, inode_ptr> current_dirents;
+   inode_ptr working_dir;
+   wordvec path;
+   string dest = "";
+   string target;
+
+   if( words.size() == 1 ) {
+      cout << "What file (or directory) " 
+           << "do you want to remove?\n";
+   }
+   else{
+      path = split( words.at(1), "/" );
+      if( words.at(1).at(0) == '/' ) {
+         dest = dest + "/";
+      }
+      if( path.size() ==1 ) {
+         target = path.at(0);
+      }
+      else if( path.size() > 1 ){
+         target = path.at( path.size() -1 );
+         for( long unsigned i = 0; i <= path.size() - 2; ++i) {
+            dest = dest + path.at(i) + "/";
+         }
+      }
+      working_dir = state.get_dest( dest );
+      current_dirents = 
+           working_dir->get_contents()->get_dirents();
+      for( it = current_dirents.begin(); 
+           it != current_dirents.end(); ++it) {
+         it = current_dirents.find( target );
+         if( it != current_dirents.end() ) {
+            if( it->second->get_type() == "DIRECTORY" ) {
+               cout << "Cannot remove a directory. " 
+                    << "You should use the "
+                    << "'rmr' to remove directory.\n";
+            }
+            else if( it->second->get_type() == "FILE" ) {
+               working_dir->get_contents()->remove( target );
+            }
+         }
+         else {
+            cout << "No file '" << target << "' has found.\n";
+         }
+      }
+   }
+}
+void fn_rmr (inode_state& state, const wordvec& words){
+   DEBUGF ('c', state);
+   DEBUGF ('c', words);
+   map< string, inode_ptr >::iterator it;
+   map< string, inode_ptr >current_dirents;
+   string target;
+   inode_ptr working_dir;
+   
+}
+
+@
+
+
+1.18
+log
+@-
+@
+text
+@d470 5
+@
+
+
+1.17
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.16 2016-01-14 16:10:40-08 - - $
+d45 54
+d104 45
+a149 1
+
+d160 15
+a174 1
+   throw ysh_exit();
+d180 40
+d225 43
+a268 1
+
+d272 45
+a317 1
+
+d321 43
+d369 5
+d379 36
+d420 46
+a466 1
+
+@
+
+
+1.16
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.15 2016-01-14 15:13:33-08 - - $
+d24 1
+@
+
+
+1.15
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.14 2016-01-14 14:45:21-08 - - $
+d54 1
+@
+
+
+1.14
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.13 2016-01-13 16:21:53-08 - - $
+d35 6
+a40 1
+
+d56 1
+a72 1
+
+a100 6
+}
+
+int exit_status_message() {
+   int exit_status = exit_status::get();
+   cout << execname() << ": exit(" << exit_status << ")" << endl;
+   return exit_status;
+@
+
+
+1.13
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.12 2016-01-13 13:49:20-08 - - $
+d6 1
+a6 1
+commands::commands(): hash ({
+d18 1
+a18 1
+}){}
+d20 1
+a20 1
+command_fn commands::at (const string& cmd) {
+d24 2
+a25 2
+   const auto result = hash.find (cmd);
+   if (result == hash.end()) {
+@
+
+
+1.12
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.11 2014-06-11 13:49:31-07 - - $
+d26 1
+a26 1
+      throw yshell_exn (cmd + ": no such function");
+d31 4
+d54 1
+a54 1
+   throw ysh_exit_exn();
+@
+
+
+1.11
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.10 2014-04-09 17:04:58-07 - - $
+d6 1
+a6 1
+commands::commands(): map ({
+d24 2
+a25 2
+   command_map::const_iterator result = map.find (cmd);
+   if (result == map.end()) {
+@
+
+
+1.10
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.9 2014-03-26 19:55:18-07 - - $
+d20 1
+a20 1
+function commands::at (const string& cmd) {
+d23 2
+a24 2
+   // So: iterator->second is mapped_type (function)
+   commandmap::const_iterator result = map.find (cmd);
+@
+
+
+1.9
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.8 2014-03-26 18:39:40-07 - - $
+d50 1
+a50 1
+   throw ysh_exit_exn ();
+@
+
+
+1.8
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.7 2014-03-26 17:15:54-07 - - $
+d31 1
+@
+
+
+1.7
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.6 2013-06-18 18:26:51-07 - - $
+d4 1
+a4 1
+#include "trace.h"
+d6 13
+a18 13
+commands::commands(): map (commandmap()) {
+   map["cat"    ] = fn_cat    ;
+   map["cd"     ] = fn_cd     ;
+   map["echo"   ] = fn_echo   ;
+   map["exit"   ] = fn_exit   ;
+   map["ls"     ] = fn_ls     ;
+   map["lsr"    ] = fn_lsr    ;
+   map["make"   ] = fn_make   ;
+   map["mkdir"  ] = fn_mkdir  ;
+   map["prompt" ] = fn_prompt ;
+   map["pwd"    ] = fn_pwd    ;
+   map["rm"     ] = fn_rm     ;
+}
+d32 2
+a33 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d37 2
+a38 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d42 2
+a43 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d47 2
+a48 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d53 2
+a54 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d58 2
+a59 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d64 2
+a65 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d69 2
+a70 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d74 2
+a75 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d79 2
+a80 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d84 2
+a85 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+d89 2
+a90 2
+   TRACE ('c', state);
+   TRACE ('c', words);
+@
+
+
+1.6
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.5 2013-06-18 18:02:12-07 - - $
+d31 1
+a31 1
+void fn_cat (inode_state &state, const wordvec &words){
+d36 1
+a36 1
+void fn_cd (inode_state &state, const wordvec &words){
+d41 1
+a41 1
+void fn_echo (inode_state &state, const wordvec &words){
+d46 1
+a46 1
+void fn_exit (inode_state &state, const wordvec &words){
+d52 1
+a52 1
+void fn_ls (inode_state &state, const wordvec &words){
+d57 1
+a57 1
+void fn_lsr (inode_state &state, const wordvec &words){
+d63 1
+a63 1
+void fn_make (inode_state &state, const wordvec &words){
+d68 1
+a68 1
+void fn_mkdir (inode_state &state, const wordvec &words){
+d73 1
+a73 1
+void fn_prompt (inode_state &state, const wordvec &words){
+d78 1
+a78 1
+void fn_pwd (inode_state &state, const wordvec &words){
+d83 1
+a83 1
+void fn_rm (inode_state &state, const wordvec &words){
+d88 1
+a88 1
+void fn_rmr (inode_state &state, const wordvec &words){
+@
+
+
+1.5
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.4 2013-06-18 18:00:53-07 - - $
+d21 3
+@
+
+
+1.4
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.3 2013-06-18 18:00:24-07 - - $
+d25 1
+a25 1
+   return *result;
+@
+
+
+1.3
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.2 2013-06-18 17:59:10-07 - - $
+d23 1
+a23 1
+      throw yshell_exn (words[0] + ": no such function");
+@
+
+
+1.2
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.1 2013-06-18 17:31:28-07 - - $
+d22 1
+a22 1
+   if (result == map.end) {
+@
+
+
+1.1
+log
+@-
+@
+text
+@d1 1
+a1 1
+// $Id: commands.cpp,v 1.2 2012-03-29 17:31:42-07 - - $
+d20 6
+a25 2
+function commands::operator[] (const string& cmd) {
+   return map[cmd];
+@
