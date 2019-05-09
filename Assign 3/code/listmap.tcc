@@ -1,4 +1,4 @@
-// $Id: listmap.tcc,v 1.12 2019-02-21 17:28:55-08 - - $
+// $Id: listmap.tcc,v 1.13 2019-05-08 16:13:16-07 - - $
 
 #include "listmap.h"
 #include "debug.h"
@@ -13,9 +13,9 @@
 // listmap::node::node (link*, link*, const value_type&)
 //
 template <typename Key, typename Value, class Less>
-listmap<Key,Value,Less>::node::node (node* next, node* prev,
+listmap<Key,Value,Less>::node::node (node* next_, node* prev_,
                                      const value_type& value_):
-            link (next, prev), value (value_) {
+            link (next_, prev_), value (value_) {
 }
 
 //
@@ -30,6 +30,16 @@ listmap<Key,Value,Less>::node::node (node* next, node* prev,
 template <typename Key, typename Value, class Less>
 listmap<Key,Value,Less>::~listmap() {
    DEBUGF ('l', reinterpret_cast<const void*> (this));
+   iterator itor = begin();
+   while (itor != end() ) {
+      node* curr = itor.get_where();
+      ++itor;
+      anchor()->next = itor.get_where();
+      curr->next->prev = anchor();
+      curr->next = nullptr;
+      curr->prev = nullptr;
+      delete curr;
+   } 
 }
 
 
@@ -40,7 +50,53 @@ template <typename Key, typename Value, class Less>
 typename listmap<Key,Value,Less>::iterator
 listmap<Key,Value,Less>::insert (const value_type& pair) {
    DEBUGF ('l', &pair << "->" << pair);
-   return iterator();
+   //find in current listmap. if exist then replace it.
+   iterator front = begin();
+   iterator itor = begin();
+   iterator back = end();
+   if( front == back ) { //list is empty
+      node* new_node = new node( anchor(), anchor(), pair );
+      anchor()->next =  new_node;
+      anchor()->prev = new_node;
+      ++itor;
+      return itor;
+   }
+   else {
+      itor = find( pair.first ); 
+      if( itor != end() ) {
+         //found
+         itor->second = pair.second;
+         return itor;
+      }
+      else {
+         itor = begin();
+         while ( itor != end() && less(itor->first, pair.first) ) {
+            ++itor;
+         }
+         if ( itor == front ) {
+            //insert at front
+            node* new_node = new node( anchor()->next, anchor(), pair );
+            anchor()->next->prev = new_node;
+            anchor()->next = new_node;
+            --itor;
+         }
+         else if ( itor == end() ) {
+         // insert at the end
+           node* new_node = new node( anchor(), anchor()->prev, pair );
+           anchor()->prev->next = new_node;
+           anchor()->prev = new_node;
+           --itor;
+         }
+         else { //insert in the middle
+            node* curr = itor.get_where();
+            node* new_node = new node( curr, curr->prev, pair );
+            curr->prev->next = new_node;
+            curr->prev = new_node;
+            --itor;
+         }
+      return itor;
+      }
+   }
 }
 
 //
@@ -50,7 +106,11 @@ template <typename Key, typename Value, class Less>
 typename listmap<Key,Value,Less>::iterator
 listmap<Key,Value,Less>::find (const key_type& that) {
    DEBUGF ('l', that);
-   return iterator();
+   iterator itor = begin();
+   while( itor != end() && itor->first != that ) {
+      ++itor;
+   }
+   return itor;
 }
 
 //
@@ -60,7 +120,10 @@ template <typename Key, typename Value, class Less>
 typename listmap<Key,Value,Less>::iterator
 listmap<Key,Value,Less>::erase (iterator position) {
    DEBUGF ('l', &*position);
-   return iterator();
+   node* curr = position.get_where();
+   curr->prev->next = curr->next;
+   curr->next->prev = curr->prev;
+   return position;
 }
 
 
@@ -79,7 +142,16 @@ listmap<Key,Value,Less>::iterator::operator*() {
    DEBUGF ('l', where);
    return where->value;
 }
-
+//
+// void listmap::iterator::erase()
+//
+template <typename Key, typename Value, class Less>
+void listmap<Key,Value,Less>::iterator::erase() {
+   node* curr = get_where();
+   curr->next = nullptr;
+   curr->prev = nullptr;
+   delete curr;
+}
 //
 // listmap::value_type* listmap::iterator::operator->()
 //
@@ -111,7 +183,11 @@ listmap<Key,Value,Less>::iterator::operator--() {
    where = where->prev;
    return *this;
 }
-
+template <typename Key, typename Value, class Less>
+typename listmap<Key,Value,Less>::node*
+listmap<Key,Value,Less>::iterator::get_where() {
+   return where;
+}
 
 //
 // bool listmap::iterator::operator== (const iterator&)

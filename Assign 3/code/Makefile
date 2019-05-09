@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.22 2019-02-21 17:25:07-08 - - $
+# $Id: Makefile,v 1.23 2019-05-08 16:13:16-07 - - $
 
 MKFILE      = Makefile
 DEPFILE     = ${MKFILE}.dep
@@ -40,7 +40,7 @@ lis : ${ALLSOURCES}
 	mkpspdf ${LISTING} ${ALLSOURCES}
 
 clean :
-	- rm ${OBJECTS} ${DEPFILE} core
+	- rm ${OBJECTS} ${DEPFILE}
 
 spotless : clean
 	- rm ${EXECBIN} ${LISTING} ${LISTING:.ps=.pdf}
@@ -55,6 +55,8 @@ ${DEPFILE} :
 
 again :
 	${GMAKE} spotless dep ci all lis
+submit:
+	submit cmps109-wm.s19 asg3 ${ALLSOURCE} ${MKFILE} README
 
 ifeq (${NEEDINCL}, )
 include ${DEPFILE}

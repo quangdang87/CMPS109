@@ -1,4 +1,4 @@
-// $Id: listmap.h,v 1.15 2019-02-21 17:28:55-08 - - $
+// $Id: listmap.h,v 1.16 2019-05-08 16:13:16-07 - - $
 
 #ifndef __LISTMAP_H__
 #define __LISTMAP_H__
@@ -53,6 +53,7 @@ class listmap<Key,Value,Less>::iterator {
       value_type* operator->();
       iterator& operator++(); //++itor
       iterator& operator--(); //--itor
+      node* get_where();
       void erase();
       bool operator== (const iterator&) const;
       bool operator!= (const iterator&) const;
