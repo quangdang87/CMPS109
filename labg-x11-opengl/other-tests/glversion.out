@@ -1,0 +1,3 @@
+libGL error: No matching fbConfigs or visuals found
+libGL error: failed to load driver: swrast
+freeglut (glversion):  ERROR:  Internal error <FBConfig with necessary capabilities not found> in function fgOpenWindow
