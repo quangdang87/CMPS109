@@ -1,6 +1,9 @@
+// Quang Dang
+// qvdang
 // $Id: cixd.cpp,v 1.8 2019-04-05 15:04:28-07 - - $
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 using namespace std;
@@ -46,8 +49,60 @@ void reply_ls (accepted_socket& client_sock, cix_header& header) {
    send_packet (client_sock, ls_output.c_str(), ls_output.size());
    outlog << "sent " << ls_output.size() << " bytes" << endl;
 }
+void reply_get (accepted_socket& client_sock, cix_header& header ) {
+  ifstream file (header.filename, ios::binary | ios::ate );
+  if (!file.is_open() ) {
+      outlog << "file open fail. " << strerror (errno) << endl;
+      header.command = cix_command::NAK;
+      header.nbytes = errno;
+      send_packet (client_sock, &header, sizeof header);
+      return;
+  } 
+  else {
+     int size = file.tellg();
+     char * buffer = new char [size];
+     
+     file.seekg (0, ios::beg);
+     file.read (buffer, size );
+     file.close();
+     header.command = cix_command::FILEOUT;
+     header.nbytes = size;
+     send_packet (client_sock, &header, sizeof header );
+     send_packet (client_sock, &buffer, size);
+     outlog << "sent" << size << " bytes" << endl;
+     delete[] buffer;
+  }
+}
+void reply_put (accepted_socket& client_sock, cix_header& header) {
+   char buffer [0x1000];
+   recv_packet (client_sock, &buffer, header.nbytes); 
+   buffer[header.nbytes] = '\0';
+   ofstream file_received (header.filename, ios::binary);
+   if (!file_received.is_open()) {
+      outlog << "File open fail" << strerror (errno) << endl;
+      header.command = cix_command::NAK;
+      return;
+   }
+   else {
+      int size = header.nbytes + 1;
+      header.command = cix_command::ACK;
+      file_received.seekp(0);
+      file_received.write( buffer, size );
+   }
+  
+   send_packet (client_sock, &header, sizeof header);
+}
 
-
+void reply_rm (accepted_socket& client_sock, cix_header& header) {
+   int file_removed = unlink (header.filename);
+   if (file_removed == 0) {
+      header.command = cix_command::ACK;
+   }
+   else {
+      header.command = cix_command::NAK;
+   }
+   send_packet (client_sock, &header, sizeof header);
+}
 void run_server (accepted_socket& client_sock) {
    outlog.execname (outlog.execname() + "-server");
    outlog << "connected to " << to_string (client_sock) << endl;
@@ -59,6 +114,15 @@ void run_server (accepted_socket& client_sock) {
          switch (header.command) {
             case cix_command::LS: 
                reply_ls (client_sock, header);
+               break;
+            case cix_command::GET:
+               reply_get (client_sock, header);
+               break;
+            case cix_command::PUT:
+               reply_put (client_sock, header);
+               break;
+            case cix_command::RM:
+               reply_rm (client_sock, header);
                break;
             default:
                outlog << "invalid client header:" << header << endl;
